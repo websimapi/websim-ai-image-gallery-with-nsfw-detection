@@ -611,6 +611,13 @@
     <script type="text/babel">
         const { useState, useEffect, useRef } = React;
         
+        // Move getScoreClass outside of components so it can be accessed by both
+        const getScoreClass = (score) => {
+            if (score >= 70) return 'high';
+            if (score >= 30) return 'medium';
+            return 'low';
+        };
+        
         function ImageGallery() {
             const [prompt, setPrompt] = useState('');
             const [isGenerating, setIsGenerating] = useState(false);
@@ -726,12 +733,6 @@
             
             const closeRemixModal = () => {
                 setRemixModal(null);
-            };
-            
-            const getScoreClass = (score) => {
-                if (score >= 70) return 'high';
-                if (score >= 30) return 'medium';
-                return 'low';
             };
             
             const formatDate = (dateString) => {
