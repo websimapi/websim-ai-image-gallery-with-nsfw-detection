@@ -839,65 +839,29 @@
         
         function RemixModal({ image, onClose }) {
             const [userDescription, setUserDescription] = useState('');
-            const [aiDescription, setAiDescription] = useState('');
-            const [isAnalyzing, setIsAnalyzing] = useState(false);
             const [isGenerating, setIsGenerating] = useState(false);
-            const [analysisError, setAnalysisError] = useState(false);
             
+            // Use original prompt as starting point if available
             useEffect(() => {
-                analyzeImageForRemix();
-            }, [image]);
-            
-            const analyzeImageForRemix = async () => {
-                setIsAnalyzing(true);
-                setAnalysisError(false);
-                
-                try {
-                    const completion = await websim.chat.completions.create({
-                        messages: [
-                            {
-                                role: "user",
-                                content: [
-                                    {
-                                        type: "text",
-                                        text: "Analyze this image and provide a detailed description that could be used to generate a similar image. Focus on the main subject, style, colors, composition, mood, and any distinctive features. Be specific and descriptive."
-                                    },
-                                    {
-                                        type: "image_url",
-                                        image_url: { url: image.image_url }
-                                    }
-                                ]
-                            }
-                        ]
-                    });
-                    
-                    setAiDescription(completion.content);
-                } catch (error) {
-                    console.error('Error analyzing image:', error);
-                    setAnalysisError(true);
-                    setAiDescription('');
-                } finally {
-                    setIsAnalyzing(false);
+                if (image.prompt) {
+                    setUserDescription(image.prompt);
                 }
-            };
+            }, [image]);
             
             const handleGenerate = async () => {
                 if (!userDescription.trim()) {
-                    alert('Please provide a description for the remix since AI analysis failed.');
+                    alert('Please provide a description for the remix.');
                     return;
                 }
                 
                 setIsGenerating(true);
                 try {
-                    // Use user description as the main prompt when AI analysis fails
-                    let combinedPrompt = userDescription.trim();
-                    if (aiDescription) {
-                        combinedPrompt = `${aiDescription}\n\nAdditional modifications: ${userDescription}`;
-                    }
+                    // Use user description as the prompt
+                    const remixPrompt = userDescription.trim();
                     
                     // Generate new image
                     const result = await websim.imageGen({
-                        prompt: combinedPrompt,
+                        prompt: remixPrompt,
                         aspect_ratio: '1:1'
                     });
                     
@@ -907,12 +871,11 @@
                     // Save to database with remix history
                     await window.room.collection('gallery_image').create({
                         image_url: result.url,
-                        prompt: combinedPrompt,
+                        prompt: remixPrompt,
                         analysis: analysis,
                         source: 'remix',
                         original_image_id: image.id,
                         remix_description: userDescription.trim(),
-                        ai_description: aiDescription || 'AI analysis failed',
                         remix_parent_username: image.username
                     });
                     
@@ -931,46 +894,18 @@
                     <div className="remix-modal-content" onClick={(e) => e.stopPropagation()}>
                         <h3>🎨 Remix Image</h3>
                         
-                        {isAnalyzing ? (
+                        {image.prompt && (
                             <div className="ai-description">
-                                <h4>🤖 AI Analysis</h4>
-                                <p>Analyzing image...</p>
+                                <h4>📝 Original Prompt</h4>
+                                <p>{image.prompt}</p>
                             </div>
-                        ) : analysisError ? (
-                            <div className="ai-description" style={{ background: 'rgba(245, 158, 11, 0.1)', borderColor: 'rgba(245, 158, 11, 0.3)' }}>
-                                <h4>⚠️ AI Analysis Failed</h4>
-                                <p>Unable to analyze the image automatically. Please provide your own description below to create a remix.</p>
-                                <button 
-                                    onClick={analyzeImageForRemix}
-                                    style={{ 
-                                        marginTop: '8px', 
-                                        padding: '6px 12px', 
-                                        background: 'rgba(245, 158, 11, 0.2)', 
-                                        border: '1px solid rgba(245, 158, 11, 0.3)',
-                                        borderRadius: '6px',
-                                        color: 'white',
-                                        cursor: 'pointer',
-                                        fontSize: '12px'
-                                    }}
-                                >
-                                    🔄 Retry Analysis
-                                </button>
-                            </div>
-                        ) : aiDescription ? (
-                            <div className="ai-description">
-                                <h4>🤖 AI Description</h4>
-                                <p>{aiDescription}</p>
-                            </div>
-                        ) : null}
+                        )}
                         
                         <textarea
                             value={userDescription}
                             onChange={(e) => setUserDescription(e.target.value)}
-                            placeholder={analysisError ? 
-                                "Describe the image and any modifications you want to make..." : 
-                                "Add your own modifications or leave blank to generate a similar image..."}
-                            disabled={isAnalyzing}
-                            style={{ minHeight: analysisError ? '120px' : '100px' }}
+                            placeholder="Describe the image you want to generate (modify the original prompt above or create your own)..."
+                            style={{ minHeight: '120px' }}
                         />
                         
                         <div className="remix-modal-actions">
@@ -984,7 +919,7 @@
                             <button 
                                 className="remix-modal-btn remix-generate-btn"
                                 onClick={handleGenerate}
-                                disabled={isAnalyzing || isGenerating || (analysisError && !userDescription.trim())}
+                                disabled={isGenerating || !userDescription.trim()}
                             >
                                 {isGenerating ? '🎨 Generating...' : '✨ Generate Remix'}
                             </button>
