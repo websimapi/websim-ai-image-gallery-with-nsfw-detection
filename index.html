@@ -359,6 +359,124 @@
             border-color: rgba(255, 255, 255, 0.3);
         }
         
+        .remix-btn {
+            background: rgba(168, 85, 247, 0.9);
+            color: white;
+            border: 1px solid rgba(168, 85, 247, 0.3);
+        }
+        
+        .remix-btn:hover {
+            background: rgba(168, 85, 247, 1);
+            transform: translateY(-1px);
+        }
+        
+        .remix-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(10px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+        
+        .remix-modal-content {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 16px;
+            padding: 24px;
+            max-width: 500px;
+            width: 90%;
+            color: white;
+        }
+        
+        .remix-modal h3 {
+            margin-bottom: 16px;
+            font-size: 1.5rem;
+            text-align: center;
+        }
+        
+        .remix-modal textarea {
+            width: 100%;
+            min-height: 100px;
+            padding: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.05);
+            color: white;
+            font-size: 14px;
+            resize: vertical;
+            margin-bottom: 16px;
+        }
+        
+        .remix-modal textarea::placeholder {
+            color: #9ca3af;
+        }
+        
+        .remix-modal-actions {
+            display: flex;
+            gap: 12px;
+            justify-content: flex-end;
+        }
+        
+        .remix-modal-btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .remix-cancel-btn {
+            background: rgba(107, 114, 128, 0.9);
+            color: white;
+        }
+        
+        .remix-generate-btn {
+            background: linear-gradient(135deg, #168, 85, 247 0%, #139, 92, 246 100%);
+            color: white;
+        }
+        
+        .remix-generate-btn:disabled {
+            background: #374151;
+            cursor: not-allowed;
+        }
+        
+        .remix-history {
+            margin-top: 8px;
+            padding: 8px;
+            background: rgba(168, 85, 247, 0.1);
+            border-radius: 6px;
+            font-size: 12px;
+            color: #d1d5db;
+        }
+        
+        .remix-history strong {
+            color: #a855f7;
+        }
+        
+        .ai-description {
+            background: rgba(59, 130, 246, 0.1);
+            border: 1px solid rgba(59, 130, 246, 0.2);
+            border-radius: 8px;
+            padding: 12px;
+            margin-bottom: 16px;
+            font-size: 13px;
+            color: #d1d5db;
+        }
+        
+        .ai-description h4 {
+            margin-bottom: 8px;
+            color: #60a5fa;
+            font-size: 14px;
+        }
+        
         .user-stats {
             text-align: center;
             color: #d1d5db;
@@ -500,6 +618,7 @@
             const [imageAnalysis, setImageAnalysis] = useState({});
             const [viewMode, setViewMode] = useState('all'); // 'all' or 'my'
             const [currentUser, setCurrentUser] = useState(null);
+            const [remixModal, setRemixModal] = useState(null);
             const fileInputRef = useRef(null);
             
             // Get current user
@@ -601,6 +720,14 @@
                 }
             };
             
+            const handleRemix = (image) => {
+                setRemixModal(image);
+            };
+            
+            const closeRemixModal = () => {
+                setRemixModal(null);
+            };
+            
             const getScoreClass = (score) => {
                 if (score >= 70) return 'high';
                 if (score >= 30) return 'medium';
@@ -682,6 +809,7 @@
                                 image={image} 
                                 showManageOptions={viewMode === 'my'}
                                 currentUser={currentUser}
+                                onRemix={handleRemix}
                             />
                         ))}
                     </div>
@@ -697,11 +825,145 @@
                             <p>You haven't uploaded or generated any images yet.</p>
                         </div>
                     )}
+                    
+                    {remixModal && (
+                        <RemixModal 
+                            image={remixModal} 
+                            onClose={closeRemixModal}
+                        />
+                    )}
                 </div>
             );
         }
         
-        function ImageCard({ image, showManageOptions, currentUser }) {
+        function RemixModal({ image, onClose }) {
+            const [userDescription, setUserDescription] = useState('');
+            const [aiDescription, setAiDescription] = useState('');
+            const [isAnalyzing, setIsAnalyzing] = useState(false);
+            const [isGenerating, setIsGenerating] = useState(false);
+            
+            useEffect(() => {
+                analyzeImageForRemix();
+            }, [image]);
+            
+            const analyzeImageForRemix = async () => {
+                setIsAnalyzing(true);
+                try {
+                    const completion = await websim.chat.completions.create({
+                        messages: [
+                            {
+                                role: "user",
+                                content: [
+                                    {
+                                        type: "text",
+                                        text: "Analyze this image and provide a detailed description that could be used to generate a similar image. Focus on the main subject, style, colors, composition, mood, and any distinctive features. Be specific and descriptive."
+                                    },
+                                    {
+                                        type: "image_url",
+                                        image_url: { url: image.image_url }
+                                    }
+                                ]
+                            }
+                        ]
+                    });
+                    
+                    setAiDescription(completion.content);
+                } catch (error) {
+                    console.error('Error analyzing image:', error);
+                    setAiDescription('Unable to analyze image. Please provide your own description.');
+                } finally {
+                    setIsAnalyzing(false);
+                }
+            };
+            
+            const handleGenerate = async () => {
+                if (!aiDescription && !userDescription.trim()) return;
+                
+                setIsGenerating(true);
+                try {
+                    // Combine AI description with user description
+                    let combinedPrompt = aiDescription;
+                    if (userDescription.trim()) {
+                        combinedPrompt = `${aiDescription}\n\nAdditional modifications: ${userDescription}`;
+                    }
+                    
+                    // Generate new image
+                    const result = await websim.imageGen({
+                        prompt: combinedPrompt,
+                        aspect_ratio: '1:1'
+                    });
+                    
+                    // Analyze the generated image
+                    const analysis = await window.nsfwDetector.analyzeImage(result.url);
+                    
+                    // Save to database with remix history
+                    await window.room.collection('gallery_image').create({
+                        image_url: result.url,
+                        prompt: combinedPrompt,
+                        analysis: analysis,
+                        source: 'remix',
+                        original_image_id: image.id,
+                        remix_description: userDescription.trim(),
+                        ai_description: aiDescription,
+                        remix_parent_username: image.username
+                    });
+                    
+                    onClose();
+                    
+                } catch (error) {
+                    console.error('Remix generation failed:', error);
+                    alert('Remix generation failed. Please try again.');
+                } finally {
+                    setIsGenerating(false);
+                }
+            };
+            
+            return (
+                <div className="remix-modal" onClick={onClose}>
+                    <div className="remix-modal-content" onClick={(e) => e.stopPropagation()}>
+                        <h3>🎨 Remix Image</h3>
+                        
+                        {isAnalyzing ? (
+                            <div className="ai-description">
+                                <h4>🤖 AI Analysis</h4>
+                                <p>Analyzing image...</p>
+                            </div>
+                        ) : (
+                            <div className="ai-description">
+                                <h4>🤖 AI Description</h4>
+                                <p>{aiDescription}</p>
+                            </div>
+                        )}
+                        
+                        <textarea
+                            value={userDescription}
+                            onChange={(e) => setUserDescription(e.target.value)}
+                            placeholder="Add your own modifications or leave blank to generate a similar image..."
+                            disabled={isAnalyzing}
+                        />
+                        
+                        <div className="remix-modal-actions">
+                            <button 
+                                className="remix-modal-btn remix-cancel-btn"
+                                onClick={onClose}
+                                disabled={isGenerating}
+                            >
+                                Cancel
+                            </button>
+                            <button 
+                                className="remix-modal-btn remix-generate-btn"
+                                onClick={handleGenerate}
+                                disabled={isAnalyzing || isGenerating || (!aiDescription && !userDescription.trim())}
+                            >
+                                {isGenerating ? '🎨 Generating...' : '✨ Generate Remix'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+        
+        function ImageCard({ image, showManageOptions, currentUser, onRemix }) {
             const [isAnalyzing, setIsAnalyzing] = useState(!image.analysis);
             const [analysis, setAnalysis] = useState(image.analysis || null);
             const [isDeleting, setIsDeleting] = useState(false);
@@ -762,12 +1024,6 @@
                 }
             };
             
-            const getScoreClass = (score) => {
-                if (score >= 70) return 'high';
-                if (score >= 30) return 'medium';
-                return 'low';
-            };
-            
             const canManage = currentUser && image.username === currentUser.username;
             
             return (
@@ -807,8 +1063,20 @@
                             📅 {new Date(image.created_at).toLocaleDateString()}
                         </div>
                         <div style={{ marginTop: '5px', fontSize: '12px', color: '#999' }}>
-                            {image.source === 'ai_generated' ? '🤖 AI Generated' : '📁 Uploaded'}
+                            {image.source === 'ai_generated' ? '🤖 AI Generated' : 
+                             image.source === 'remix' ? '🎨 Remix' : '📁 Uploaded'}
                         </div>
+                        
+                        {image.source === 'remix' && (
+                            <div className="remix-history">
+                                <strong>Remixed from:</strong> {image.remix_parent_username}'s image
+                                {image.remix_description && (
+                                    <div style={{ marginTop: '4px' }}>
+                                        <strong>Modifications:</strong> {image.remix_description}
+                                    </div>
+                                )}
+                            </div>
+                        )}
                         
                         <div className="image-actions">
                             <button 
@@ -817,6 +1085,14 @@
                                 title="Download image"
                             >
                                 ⬇️ Download
+                            </button>
+                            
+                            <button 
+                                className="action-btn remix-btn" 
+                                onClick={() => onRemix(image)}
+                                title="Remix this image"
+                            >
+                                🎨 Remix
                             </button>
                             
                             {(showManageOptions && canManage) && (
